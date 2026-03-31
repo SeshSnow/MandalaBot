@@ -22,9 +22,14 @@ class ContextBuilder:
     def __init__(self, workspace: Path, timezone: str | None = None, storage=None):
         self.workspace = workspace
         self.timezone = timezone
-        self.storage = storage
-        self.memory = MemoryStore(workspace, storage=storage)
-        self.skills = SkillsLoader(workspace, storage=storage)
+        # Always use storage — LocalBackend wraps pathlib, AzureBackend uses remote
+        if storage is None:
+            from nanobot.storage.local import LocalBackend
+            self.storage = LocalBackend(root=str(workspace))
+        else:
+            self.storage = storage
+        self.memory = MemoryStore(workspace, storage=self.storage)
+        self.skills = SkillsLoader(workspace, storage=self.storage)
 
     def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
@@ -113,23 +118,17 @@ IMPORTANT: To send files (images, documents, audio, video) to the user, you MUST
 
     def _load_bootstrap_files(self) -> str:
         """Load all bootstrap files from workspace."""
+        import asyncio
         parts = []
 
         for filename in self.BOOTSTRAP_FILES:
-            if self.storage:
-                try:
-                    import asyncio
-                    loop = asyncio.get_event_loop()
-                    if not loop.is_running():
-                        content = loop.run_until_complete(self.storage.read(filename))
-                        parts.append(f"## {filename}\n\n{content}")
-                except Exception:
-                    pass
-            else:
-                file_path = self.workspace / filename
-                if file_path.exists():
-                    content = file_path.read_text(encoding="utf-8")
+            try:
+                loop = asyncio.get_event_loop()
+                if not loop.is_running():
+                    content = loop.run_until_complete(self.storage.read(filename))
                     parts.append(f"## {filename}\n\n{content}")
+            except Exception:
+                pass
 
         return "\n\n".join(parts) if parts else ""
 
