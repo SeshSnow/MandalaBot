@@ -1,10 +1,18 @@
-"""Skills loader for agent capabilities."""
+"""Skills loader for agent capabilities.
+
+Supports both local filesystem (pathlib) and remote storage (StorageBackend).
+Pass storage=StorageBackend for remote workspace skills, or leave as None for local.
+"""
 
 import json
 import os
 import re
 import shutil
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from nanobot.storage.base import StorageBackend
 
 # Default builtin skills directory (relative to this file)
 BUILTIN_SKILLS_DIR = Path(__file__).parent.parent / "skills"
@@ -18,9 +26,11 @@ class SkillsLoader:
     specific tools or perform certain tasks.
     """
 
-    def __init__(self, workspace: Path, builtin_skills_dir: Path | None = None):
+    def __init__(self, workspace: Path, builtin_skills_dir: Path | None = None, storage: "StorageBackend | None" = None):
         self.workspace = workspace
-        self.workspace_skills = workspace / "skills"
+        self.storage = storage
+        self.workspace_skills_path = "skills"
+        self.workspace_skills_dir = workspace / "skills"  # For local mode
         self.builtin_skills = builtin_skills_dir or BUILTIN_SKILLS_DIR
 
     def list_skills(self, filter_unavailable: bool = True) -> list[dict[str, str]]:
@@ -36,14 +46,32 @@ class SkillsLoader:
         skills = []
 
         # Workspace skills (highest priority)
-        if self.workspace_skills.exists():
-            for skill_dir in self.workspace_skills.iterdir():
-                if skill_dir.is_dir():
-                    skill_file = skill_dir / "SKILL.md"
-                    if skill_file.exists():
-                        skills.append({"name": skill_dir.name, "path": str(skill_file), "source": "workspace"})
+        if self.storage:
+            # Remote storage
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if not loop.is_running():
+                    entries = loop.run_until_complete(self.storage.list(self.workspace_skills_path))
+                    for name in entries:
+                        skill_path = f"{self.workspace_skills_path}/{name}/SKILL.md"
+                        try:
+                            loop.run_until_complete(self.storage.read(skill_path))
+                            skills.append({"name": name, "path": skill_path, "source": "workspace"})
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+        else:
+            # Local filesystem
+            if self.workspace_skills_dir.exists():
+                for skill_dir in self.workspace_skills_dir.iterdir():
+                    if skill_dir.is_dir():
+                        skill_file = skill_dir / "SKILL.md"
+                        if skill_file.exists():
+                            skills.append({"name": skill_dir.name, "path": str(skill_file), "source": "workspace"})
 
-        # Built-in skills
+        # Built-in skills (always local filesystem)
         if self.builtin_skills and self.builtin_skills.exists():
             for skill_dir in self.builtin_skills.iterdir():
                 if skill_dir.is_dir():
@@ -67,11 +95,45 @@ class SkillsLoader:
             Skill content or None if not found.
         """
         # Check workspace first
-        workspace_skill = self.workspace_skills / name / "SKILL.md"
-        if workspace_skill.exists():
-            return workspace_skill.read_text(encoding="utf-8")
+        if self.storage:
+            workspace_skill_path = f"{self.workspace_skills_path}/{name}/SKILL.md"
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if not loop.is_running():
+                    content = loop.run_until_complete(self.storage.read(workspace_skill_path))
+                    return content
+            except Exception:
+                pass
+        else:
+            workspace_skill = self.workspace_skills_dir / name / "SKILL.md"
+            if workspace_skill.exists():
+                return workspace_skill.read_text(encoding="utf-8")
 
-        # Check built-in
+        # Check built-in (always local)
+        if self.builtin_skills:
+            builtin_skill = self.builtin_skills / name / "SKILL.md"
+            if builtin_skill.exists():
+                return builtin_skill.read_text(encoding="utf-8")
+
+        return None
+
+    async def load_skill_async(self, name: str) -> str | None:
+        """Async version for use with StorageBackend."""
+        # Check workspace first
+        if self.storage:
+            workspace_skill_path = f"{self.workspace_skills_path}/{name}/SKILL.md"
+            try:
+                content = await self.storage.read(workspace_skill_path)
+                return content
+            except Exception:
+                pass
+        else:
+            workspace_skill = self.workspace_skills_dir / name / "SKILL.md"
+            if workspace_skill.exists():
+                return workspace_skill.read_text(encoding="utf-8")
+
+        # Check built-in (always local)
         if self.builtin_skills:
             builtin_skill = self.builtin_skills / name / "SKILL.md"
             if builtin_skill.exists():

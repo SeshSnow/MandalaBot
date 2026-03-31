@@ -19,11 +19,12 @@ class ContextBuilder:
     BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
-    def __init__(self, workspace: Path, timezone: str | None = None):
+    def __init__(self, workspace: Path, timezone: str | None = None, storage=None):
         self.workspace = workspace
         self.timezone = timezone
-        self.memory = MemoryStore(workspace)
-        self.skills = SkillsLoader(workspace)
+        self.storage = storage
+        self.memory = MemoryStore(workspace, storage=storage)
+        self.skills = SkillsLoader(workspace, storage=storage)
 
     def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
@@ -115,10 +116,20 @@ IMPORTANT: To send files (images, documents, audio, video) to the user, you MUST
         parts = []
 
         for filename in self.BOOTSTRAP_FILES:
-            file_path = self.workspace / filename
-            if file_path.exists():
-                content = file_path.read_text(encoding="utf-8")
-                parts.append(f"## {filename}\n\n{content}")
+            if self.storage:
+                try:
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    if not loop.is_running():
+                        content = loop.run_until_complete(self.storage.read(filename))
+                        parts.append(f"## {filename}\n\n{content}")
+                except Exception:
+                    pass
+            else:
+                file_path = self.workspace / filename
+                if file_path.exists():
+                    content = file_path.read_text(encoding="utf-8")
+                    parts.append(f"## {filename}\n\n{content}")
 
         return "\n\n".join(parts) if parts else ""
 

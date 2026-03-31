@@ -77,23 +77,63 @@ class MemoryStore:
 
     _MAX_FAILURES_BEFORE_RAW_ARCHIVE = 3
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, storage=None):
+        self.workspace = workspace
+        self.storage = storage
+        self.memory_path_str = "memory/MEMORY.md"
+        self.history_path_str = "memory/HISTORY.md"
+
+        # Local paths (for local mode and fallback)
         self.memory_dir = ensure_dir(workspace / "memory")
         self.memory_file = self.memory_dir / "MEMORY.md"
         self.history_file = self.memory_dir / "HISTORY.md"
         self._consecutive_failures = 0
 
     def read_long_term(self) -> str:
-        if self.memory_file.exists():
-            return self.memory_file.read_text(encoding="utf-8")
-        return ""
+        if self.storage:
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if not loop.is_running():
+                    return loop.run_until_complete(self.storage.read(self.memory_path_str))
+            except Exception:
+                pass
+            return ""
+        else:
+            if self.memory_file.exists():
+                return self.memory_file.read_text(encoding="utf-8")
+            return ""
 
     def write_long_term(self, content: str) -> None:
-        self.memory_file.write_text(content, encoding="utf-8")
+        if self.storage:
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if not loop.is_running():
+                    loop.run_until_complete(self.storage.write(self.memory_path_str, content))
+            except Exception as e:
+                logger.error("Failed to write memory: {}", e)
+        else:
+            self.memory_file.write_text(content, encoding="utf-8")
 
     def append_history(self, entry: str) -> None:
-        with open(self.history_file, "a", encoding="utf-8") as f:
-            f.write(entry.rstrip() + "\n\n")
+        if self.storage:
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if not loop.is_running():
+                    existing = ""
+                    try:
+                        existing = loop.run_until_complete(self.storage.read(self.history_path_str))
+                    except Exception:
+                        pass
+                    new_content = existing + entry.rstrip() + "\n\n"
+                    loop.run_until_complete(self.storage.write(self.history_path_str, new_content))
+            except Exception as e:
+                logger.error("Failed to append history: {}", e)
+        else:
+            with open(self.history_file, "a", encoding="utf-8") as f:
+                f.write(entry.rstrip() + "\n\n")
 
     def get_memory_context(self) -> str:
         long_term = self.read_long_term()
