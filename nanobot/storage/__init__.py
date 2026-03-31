@@ -1,7 +1,7 @@
 """Storage backend interface and implementations.
 
 Provides an abstraction layer for workspace file access, enabling both
-local filesystem and remote (S3/GCS) storage with the same interface.
+local filesystem and remote (Azure Blob Storage) with the same interface.
 """
 
 from nanobot.storage.base import StorageBackend

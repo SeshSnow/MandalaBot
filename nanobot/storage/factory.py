@@ -18,10 +18,10 @@ def create_storage(
     Create a storage backend from config or workspace path.
 
     Args:
-        config: Storage config dict with 'type' key ('local' or 's3').
+        config: Storage config dict with 'type' key ('local' or 'azure').
             If None, falls back to workspace path (local mode).
         workspace: Workspace path for local mode (fallback if no config).
-        tenant_id: Tenant ID for multi-tenant S3 prefix scoping.
+        tenant_id: Tenant ID for multi-tenant prefix scoping.
 
     Returns:
         StorageBackend instance.
@@ -30,27 +30,27 @@ def create_storage(
         # Local development
         storage = create_storage(workspace="/path/to/workspace")
 
-        # S3 production
+        # Azure Blob Storage production
         storage = create_storage(config={
-            "type": "s3",
-            "s3": {
-                "bucket": "mandala-prod",
-                "prefix": "workspaces/{tenant_id}/",
-                "region": "us-west-2"
+            "type": "azure",
+            "azure": {
+                "connection_string": "DefaultEndpointsProtocol=...",
+                "container": "nanobot-workspace",
+                "prefix": "workspaces/{tenant_id}/"
             }
         }, tenant_id="tenant_123")
     """
-    if config and config.get("type") == "s3":
-        s3_config = config.get("s3", {})
-        prefix = s3_config.get("prefix", "")
+    if config and config.get("type") == "azure":
+        azure_config = config.get("azure", {})
+        prefix = azure_config.get("prefix", "")
         if tenant_id and "{tenant_id}" in prefix:
             prefix = prefix.replace("{tenant_id}", tenant_id)
 
-        from nanobot.storage.s3 import S3Backend
-        return S3Backend(
-            bucket=s3_config["bucket"],
+        from nanobot.storage.azure import AzureBackend
+        return AzureBackend(
+            connection_string=azure_config["connection_string"],
+            container=azure_config.get("container", "nanobot-workspace"),
             prefix=prefix,
-            region=s3_config.get("region", "us-east-1"),
         )
 
     # Default: local filesystem
