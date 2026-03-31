@@ -20,7 +20,6 @@ from nanobot.agent.runner import AgentRunSpec, AgentRunner
 from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.skills import BUILTIN_SKILLS_DIR
-from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.message import MessageTool
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.tools.shell import ExecTool
@@ -174,6 +173,7 @@ class AgentLoop:
         channels_config: ChannelsConfig | None = None,
         timezone: str | None = None,
         hooks: list[AgentHook] | None = None,
+        storage: "StorageBackend | None" = None,
     ):
         from nanobot.config.schema import ExecToolConfig, WebSearchConfig
 
@@ -181,6 +181,7 @@ class AgentLoop:
         self.channels_config = channels_config
         self.provider = provider
         self.workspace = workspace
+        self.storage = storage  # Optional StorageBackend for remote/distributed storage
         self.model = model or provider.get_default_model()
         self.max_iterations = max_iterations
         self.context_window_tokens = context_window_tokens
@@ -193,7 +194,7 @@ class AgentLoop:
         self._last_usage: dict[str, int] = {}
         self._extra_hooks: list[AgentHook] = hooks or []
 
-        self.context = ContextBuilder(workspace, timezone=timezone)
+        self.context = ContextBuilder(workspace, timezone=timezone, storage=self.storage)
         self.sessions = session_manager or SessionManager(workspace)
         self.tools = ToolRegistry()
         self.runner = AgentRunner(provider)
@@ -206,6 +207,7 @@ class AgentLoop:
             web_proxy=web_proxy,
             exec_config=self.exec_config,
             restrict_to_workspace=restrict_to_workspace,
+            storage=self.storage,
         )
 
         self._running = False
@@ -237,11 +239,14 @@ class AgentLoop:
 
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
-        allowed_dir = self.workspace if self.restrict_to_workspace else None
-        extra_read = [BUILTIN_SKILLS_DIR] if allowed_dir else None
-        self.tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir, extra_allowed_dirs=extra_read))
-        for cls in (WriteFileTool, EditFileTool, ListDirTool):
-            self.tools.register(cls(workspace=self.workspace, allowed_dir=allowed_dir))
+        # Storage-backed filesystem tools (works with local, Azure, or any backend)
+        from nanobot.agent.tools.filesystem import (
+            ReadFileTool, WriteFileTool, EditFileTool, ListDirTool,
+        )
+        self.tools.register(ReadFileTool(storage=self.storage))
+        self.tools.register(WriteFileTool(storage=self.storage))
+        self.tools.register(EditFileTool(storage=self.storage))
+        self.tools.register(ListDirTool(storage=self.storage))
         if self.exec_config.enable:
             self.tools.register(ExecTool(
                 working_dir=str(self.workspace),
@@ -253,6 +258,16 @@ class AgentLoop:
         self.tools.register(WebFetchTool(proxy=self.web_proxy))
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         self.tools.register(SpawnTool(manager=self.subagents))
+
+        # Research scratch pad — uses web_search and web_fetch under the hood
+        from nanobot.agent.tools.research.scratch import ResearchScratchTool
+        web_search_tool = self.tools.get("web_search")
+        web_fetch_tool = self.tools.get("web_fetch")
+        self.tools.register(ResearchScratchTool(
+            workspace=self.workspace,
+            web_fetch_fn=web_fetch_tool.execute if web_fetch_tool else None,
+            web_search_fn=web_search_tool.execute if web_search_tool else None,
+        ))
         if self.cron_service:
             self.tools.register(
                 CronTool(self.cron_service, default_timezone=self.context.timezone or "UTC")
