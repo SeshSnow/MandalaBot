@@ -111,7 +111,7 @@ class SubagentManager:
             # Build subagent tools (no message tool, no spawn tool)
             tools = ToolRegistry()
             # Storage-backed filesystem tools
-            from nanobot.agent.tools.filesystem_storage import (
+            from nanobot.agent.tools.filesystem import (
                 ReadFileTool, WriteFileTool, EditFileTool, ListDirTool,
             )
             tools.register(ReadFileTool(storage=self.storage))

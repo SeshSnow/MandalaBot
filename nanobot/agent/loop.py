@@ -240,7 +240,7 @@ class AgentLoop:
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
         # Storage-backed filesystem tools (works with local, Azure, or any backend)
-        from nanobot.agent.tools.filesystem_storage import (
+        from nanobot.agent.tools.filesystem import (
             ReadFileTool, WriteFileTool, EditFileTool, ListDirTool,
         )
         self.tools.register(ReadFileTool(storage=self.storage))
