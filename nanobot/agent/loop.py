@@ -20,7 +20,6 @@ from nanobot.agent.runner import AgentRunSpec, AgentRunner
 from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.skills import BUILTIN_SKILLS_DIR
-from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.message import MessageTool
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.tools.shell import ExecTool
@@ -240,22 +239,14 @@ class AgentLoop:
 
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
-        if self.storage:
-            # Use storage-backed filesystem tools (works with local, S3, GCS)
-            from nanobot.agent.tools.filesystem_storage import (
-                ReadFileTool, WriteFileTool, EditFileTool, ListDirTool,
-            )
-            self.tools.register(ReadFileTool(storage=self.storage))
-            self.tools.register(WriteFileTool(storage=self.storage))
-            self.tools.register(EditFileTool(storage=self.storage))
-            self.tools.register(ListDirTool(storage=self.storage))
-        else:
-            # Use local filesystem tools (pathlib-based)
-            allowed_dir = self.workspace if self.restrict_to_workspace else None
-            extra_read = [BUILTIN_SKILLS_DIR] if allowed_dir else None
-            self.tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir, extra_allowed_dirs=extra_read))
-            for cls in (WriteFileTool, EditFileTool, ListDirTool):
-                self.tools.register(cls(workspace=self.workspace, allowed_dir=allowed_dir))
+        # Storage-backed filesystem tools (works with local, Azure, or any backend)
+        from nanobot.agent.tools.filesystem_storage import (
+            ReadFileTool, WriteFileTool, EditFileTool, ListDirTool,
+        )
+        self.tools.register(ReadFileTool(storage=self.storage))
+        self.tools.register(WriteFileTool(storage=self.storage))
+        self.tools.register(EditFileTool(storage=self.storage))
+        self.tools.register(ListDirTool(storage=self.storage))
         if self.exec_config.enable:
             self.tools.register(ExecTool(
                 working_dir=str(self.workspace),

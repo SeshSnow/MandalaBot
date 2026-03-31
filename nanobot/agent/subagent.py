@@ -11,7 +11,6 @@ from loguru import logger
 from nanobot.agent.hook import AgentHook, AgentHookContext
 from nanobot.agent.runner import AgentRunSpec, AgentRunner
 from nanobot.agent.skills import BUILTIN_SKILLS_DIR
-from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
@@ -111,24 +110,14 @@ class SubagentManager:
         try:
             # Build subagent tools (no message tool, no spawn tool)
             tools = ToolRegistry()
-            if self.storage:
-                from nanobot.agent.tools.filesystem_storage import (
-                    ReadFileTool as StorageReadFileTool,
-                    WriteFileTool as StorageWriteFileTool,
-                    EditFileTool as StorageEditFileTool,
-                    ListDirTool as StorageListDirTool,
-                )
-                tools.register(StorageReadFileTool(storage=self.storage))
-                tools.register(StorageWriteFileTool(storage=self.storage))
-                tools.register(StorageEditFileTool(storage=self.storage))
-                tools.register(StorageListDirTool(storage=self.storage))
-            else:
-                allowed_dir = self.workspace if self.restrict_to_workspace else None
-                extra_read = [BUILTIN_SKILLS_DIR] if allowed_dir else None
-                tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir, extra_allowed_dirs=extra_read))
-                tools.register(WriteFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
-                tools.register(EditFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
-                tools.register(ListDirTool(workspace=self.workspace, allowed_dir=allowed_dir))
+            # Storage-backed filesystem tools
+            from nanobot.agent.tools.filesystem_storage import (
+                ReadFileTool, WriteFileTool, EditFileTool, ListDirTool,
+            )
+            tools.register(ReadFileTool(storage=self.storage))
+            tools.register(WriteFileTool(storage=self.storage))
+            tools.register(EditFileTool(storage=self.storage))
+            tools.register(ListDirTool(storage=self.storage))
             tools.register(ExecTool(
                 working_dir=str(self.workspace),
                 timeout=self.exec_config.timeout,
