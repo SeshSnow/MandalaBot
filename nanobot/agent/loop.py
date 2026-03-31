@@ -266,6 +266,16 @@ class AgentLoop:
         self.tools.register(WebFetchTool(proxy=self.web_proxy))
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         self.tools.register(SpawnTool(manager=self.subagents))
+
+        # Research scratch pad — uses web_search and web_fetch under the hood
+        from nanobot.agent.tools.research.scratch import ResearchScratchTool
+        web_search_tool = self.tools.get("web_search")
+        web_fetch_tool = self.tools.get("web_fetch")
+        self.tools.register(ResearchScratchTool(
+            workspace=self.workspace,
+            web_fetch_fn=web_fetch_tool.execute if web_fetch_tool else None,
+            web_search_fn=web_search_tool.execute if web_search_tool else None,
+        ))
         if self.cron_service:
             self.tools.register(
                 CronTool(self.cron_service, default_timezone=self.context.timezone or "UTC")
