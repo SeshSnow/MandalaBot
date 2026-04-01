@@ -52,7 +52,22 @@ dependencies = [
 
 [project.optional-dependencies]
 api = [
-    "aiohttp>=3.9.0,<4.0.0",
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn[standard]>=0.34.0,<1.0.0",
+]
+# Full Mandala application layer (server + db + Shopify/SEO/Azure)
+mandala = [
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn[standard]>=0.34.0,<1.0.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.30.0",
+    "psycopg2-binary>=2.9.0",
+    "alembic>=1.14.0",
+    "pgvector>=0.3.0",
+    "azure-storage-blob>=12.19.0",
+    "cryptography>=42.0.0",
+    "numpy>=1.26.0",
+    "firecrawl-py>=1.0.0",
 ]
 wecom = [
     "wecom-aibot-sdk-python>=0.1.5",

@@ -1,0 +1,13 @@
+{
+  "providers": {
+    "openrouter": {
+      "apiKey": "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"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "minimax/minimax-m2.7",
+      "provider": "openrouter"
+    }
+  }
+}
