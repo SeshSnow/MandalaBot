@@ -6,6 +6,7 @@ x-common-config: &common-config
     - ~/.nanobot:/root/.nanobot
 
 services:
+  # --- Original gateway/CLI services (unchanged) ---
   nanobot-gateway:
     container_name: nanobot-gateway
     <<: *common-config
@@ -13,15 +14,20 @@ services:
     restart: unless-stopped
     ports:
       - 18790:18790
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-minimax/minimax-m2.7}
+    volumes:
+      - ./config.json:/root/.nanobot/config.json:ro
     deploy:
       resources:
         limits:
-          cpus: '1'
+          cpus: "1"
           memory: 1G
         reservations:
-          cpus: '0.25'
+          cpus: "0.25"
           memory: 256M
-  
+
   nanobot-cli:
     <<: *common-config
     profiles:
@@ -29,3 +35,63 @@ services:
     command: ["status"]
     stdin_open: true
     tty: true
+
+  # --- Mandala API server (activate with: docker compose --profile mandala up) ---
+  nanobot-api:
+    container_name: nanobot-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles:
+      - mandala
+    command:
+      [
+        "serve",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8900",
+        "--config",
+        "/app/config.json",
+      ]
+    restart: unless-stopped
+    ports:
+      - "8900:8900"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://nanobot:nanobot@db:5432/nanobot
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-moonshotai/kimi-k2.5}
+      - SHOPIFY_TOKEN_ENCRYPTION_KEY=${SHOPIFY_TOKEN_ENCRYPTION_KEY}
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - API__HOST=0.0.0.0
+      - API__PORT=8900
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - nanobot_workspace:/root/.nanobot/workspace
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: pgvector/pgvector:pg16
+    profiles:
+      - mandala
+    environment:
+      POSTGRES_DB: nanobot
+      POSTGRES_USER: nanobot
+      POSTGRES_PASSWORD: nanobot
+    ports:
+      - "5432:5432"
+    volumes:
+      - nanobot_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nanobot -d nanobot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  nanobot_pgdata:
+  nanobot_workspace:
