@@ -27,8 +27,8 @@ def _get_sync_url() -> str:
     """Return a sync (psycopg2) DB URL for Alembic."""
     url = os.getenv("DATABASE_URL", "")
     if not url:
-        # Fallback: try legacy env var used by Mandala
-        url = os.getenv("DATABASE_URL", "")
+        # Fallback: support legacy Mandala-prefixed URL
+        url = os.getenv("NANOBOT_DATABASE_URL", "")
     if not url:
         return "postgresql://nanobot:nanobot@localhost:5432/nanobot"
     if "asyncpg" in url:

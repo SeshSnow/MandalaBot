@@ -41,9 +41,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_memories_key", table_name="memories")
-    op.drop_index("ix_memories_scope", table_name="memories")
-    op.drop_table("memories")
     op.drop_index("ix_messages_conversation_id", table_name="messages")
     op.drop_table("messages")
     op.drop_table("conversations")

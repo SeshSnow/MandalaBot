@@ -1,7 +1,7 @@
 """Add nanobot_vector_store table with pgvector and full-text search
 
 Revision ID: 20260217000001
-Revises: 20260204000001
+Revises: 20260216000001
 Create Date: 2026-02-17
 
 """
@@ -14,7 +14,7 @@ from pgvector.sqlalchemy import Vector
 from alembic import op
 
 revision: str = "20260217000001"
-down_revision: str | None = "20260204000001"
+down_revision: str | None = "20260216000001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
