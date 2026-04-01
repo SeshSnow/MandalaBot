@@ -505,13 +505,14 @@ def serve(
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
     config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
 ):
-    """Start the OpenAI-compatible API server (/v1/chat/completions)."""
+    """Start the API server (/v1/chat/completions + optional Mandala routes)."""
     try:
-        from aiohttp import web  # noqa: F401
+        import uvicorn  # noqa: F401
     except ImportError:
-        console.print("[red]aiohttp is required. Install with: pip install 'nanobot-ai[api]'[/red]")
+        console.print("[red]uvicorn is required. Install with: pip install 'nanobot-ai[server]'[/red]")
         raise typer.Exit(1)
 
+    import uvicorn
     from loguru import logger
     from nanobot.agent.loop import AgentLoop
     from nanobot.api.server import create_app
@@ -549,12 +550,16 @@ def serve(
         timezone=runtime_config.agents.defaults.timezone,
     )
 
+    mandala_cfg = runtime_config.mandala
     model_name = runtime_config.agents.defaults.model
-    console.print(f"{__logo__} Starting OpenAI-compatible API server")
+
+    console.print(f"{__logo__} Starting API server")
     console.print(f"  [cyan]Endpoint[/cyan] : http://{host}:{port}/v1/chat/completions")
     console.print(f"  [cyan]Model[/cyan]    : {model_name}")
-    console.print("  [cyan]Session[/cyan]  : api:default")
     console.print(f"  [cyan]Timeout[/cyan]  : {timeout}s")
+    if mandala_cfg.enabled:
+        console.print(f"  [cyan]Mandala[/cyan]  : enabled (DB: {mandala_cfg.database_url[:30]}...)")
+        console.print(f"  [cyan]Routes[/cyan]   : http://{host}:{port}/api/v1/")
     if host in {"0.0.0.0", "::"}:
         console.print(
             "[yellow]Warning:[/yellow] API is bound to all interfaces. "
@@ -562,18 +567,14 @@ def serve(
         )
     console.print()
 
-    api_app = create_app(agent_loop, model_name=model_name, request_timeout=timeout)
+    api_app = create_app(
+        agent_loop,
+        model_name=model_name,
+        request_timeout=timeout,
+        mandala_config=mandala_cfg if mandala_cfg.enabled else None,
+    )
 
-    async def on_startup(_app):
-        await agent_loop._connect_mcp()
-
-    async def on_cleanup(_app):
-        await agent_loop.close_mcp()
-
-    api_app.on_startup.append(on_startup)
-    api_app.on_cleanup.append(on_cleanup)
-
-    web.run_app(api_app, host=host, port=port, print=lambda msg: logger.info(msg))
+    uvicorn.run(api_app, host=host, port=port, log_level="warning")
 
 
 # ============================================================================

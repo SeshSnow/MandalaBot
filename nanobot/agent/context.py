@@ -31,7 +31,7 @@ class ContextBuilder:
 
         bootstrap = self._load_bootstrap_files()
         if bootstrap:
-            parts.append(bootstrap)
+            parts.append(bootstrap
 
         memory = self.memory.get_memory_context()
         if memory:

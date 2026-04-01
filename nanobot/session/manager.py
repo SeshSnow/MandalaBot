@@ -266,3 +266,7 @@ class SessionManager:
                 continue
 
         return sorted(sessions, key=lambda x: x.get("updated_at", ""), reverse=True)
+
+    def invalidate(self, key: str) -> None:
+        """Remove a session from the in-memory cache (file stays on disk)."""
+        self._cache.pop(key, None)
