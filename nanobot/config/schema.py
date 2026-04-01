@@ -158,6 +158,26 @@ class ToolsConfig(Base):
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
 
 
+
+class StorageLocalConfig(Base):
+    """Local filesystem storage config."""
+    root: str = "~/.nanobot/workspace"
+
+
+class StorageAzureConfig(Base):
+    """Azure Blob Storage config."""
+    connection_string: str = ""  # Or use AZURE_STORAGE_CONNECTION_STRING env var
+    container: str = "nanobot-workspace"
+    prefix: str = ""  # e.g. "workspaces/{tenant_id}/"
+
+
+class StorageConfig(Base):
+    """Storage backend configuration."""
+    type: str = "local"  # "local" or "azure"
+    local: StorageLocalConfig = Field(default_factory=StorageLocalConfig)
+    azure: StorageAzureConfig = Field(default_factory=StorageAzureConfig)
+
+
 class Config(BaseSettings):
     """Root configuration for nanobot."""
 
@@ -166,6 +186,7 @@ class Config(BaseSettings):
     providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
     api: ApiConfig = Field(default_factory=ApiConfig)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
 
     @property

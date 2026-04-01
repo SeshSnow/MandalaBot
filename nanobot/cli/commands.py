@@ -517,6 +517,7 @@ def serve(
     from nanobot.api.server import create_app
     from nanobot.bus.queue import MessageBus
     from nanobot.session.manager import SessionManager
+    from nanobot.storage.factory import create_storage
 
     if verbose:
         logger.enable("nanobot")
@@ -532,6 +533,10 @@ def serve(
     bus = MessageBus()
     provider = _make_provider(runtime_config)
     session_manager = SessionManager(runtime_config.workspace_path)
+    storage = create_storage(
+        config=runtime_config.storage.model_dump() if hasattr(runtime_config, 'storage') else None,
+        workspace=str(runtime_config.workspace_path),
+    )
     agent_loop = AgentLoop(
         bus=bus,
         provider=provider,
@@ -547,6 +552,7 @@ def serve(
         mcp_servers=runtime_config.tools.mcp_servers,
         channels_config=runtime_config.channels,
         timezone=runtime_config.agents.defaults.timezone,
+        storage=storage,
     )
 
     model_name = runtime_config.agents.defaults.model
@@ -596,6 +602,7 @@ def gateway(
     from nanobot.cron.types import CronJob
     from nanobot.heartbeat.service import HeartbeatService
     from nanobot.session.manager import SessionManager
+    from nanobot.storage.factory import create_storage
 
     if verbose:
         import logging
@@ -609,6 +616,11 @@ def gateway(
     bus = MessageBus()
     provider = _make_provider(config)
     session_manager = SessionManager(config.workspace_path)
+    from nanobot.storage.factory import create_storage
+    storage = create_storage(
+        config=config.storage.model_dump() if hasattr(config, 'storage') else None,
+        workspace=str(config.workspace_path),
+    )
 
     # Preserve existing single-workspace installs, but keep custom workspaces clean.
     if is_default_workspace(config.workspace_path):
@@ -631,6 +643,7 @@ def gateway(
         exec_config=config.tools.exec,
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
+        storage=storage,
         session_manager=session_manager,
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
@@ -805,12 +818,17 @@ def agent(
     from nanobot.agent.loop import AgentLoop
     from nanobot.bus.queue import MessageBus
     from nanobot.cron.service import CronService
+    from nanobot.storage.factory import create_storage
 
     config = _load_runtime_config(config, workspace)
     sync_workspace_templates(config.workspace_path)
 
     bus = MessageBus()
     provider = _make_provider(config)
+    storage = create_storage(
+        config=config.storage.model_dump() if hasattr(config, 'storage') else None,
+        workspace=str(config.workspace_path),
+    )
 
     # Preserve existing single-workspace installs, but keep custom workspaces clean.
     if is_default_workspace(config.workspace_path):
@@ -837,6 +855,7 @@ def agent(
         exec_config=config.tools.exec,
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
+        storage=storage,
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         timezone=config.agents.defaults.timezone,

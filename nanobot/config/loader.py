@@ -19,9 +19,31 @@ def set_config_path(path: Path) -> None:
 
 
 def get_config_path() -> Path:
-    """Get the configuration file path."""
+    """Get the configuration file path.
+
+    Lookup order:
+    1. Explicitly set path (set_config_path)
+    2. NANOBOT_CONFIG env var
+    3. ./config.json in project root (for deployment)
+    4. ~/.nanobot/config.json (for local dev)
+    """
+    import os
+
     if _current_config_path:
         return _current_config_path
+
+    # Env var override
+    env_path = os.environ.get("NANOBOT_CONFIG")
+    if env_path:
+        return Path(env_path)
+
+    # Project root (deployed with code)
+    project_root = Path(__file__).parent.parent.parent
+    project_config = project_root / "config.json"
+    if project_config.exists():
+        return project_config
+
+    # Home directory (local dev)
     return Path.home() / ".nanobot" / "config.json"
 
 
