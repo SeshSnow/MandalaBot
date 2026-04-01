@@ -5,6 +5,20 @@ from __future__ import annotations
 from pathlib import Path
 
 from nanobot.config.loader import get_config_path
+
+def get_workspace_from_storage(storage_config: dict | None = None) -> Path:
+    """
+    Get workspace path. In remote mode, returns a local temp dir
+    (sessions + cron only). In local mode, returns the storage root.
+    """
+    import tempfile
+    if storage_config and storage_config.get('type') != 'local':
+        # Remote storage — use temp dir for local-only state
+        return Path(tempfile.gettempdir()) / 'nanobot' / 'workspace'
+    # Local storage — use the configured root
+    root = storage_config.get('local', {}).get('root', '~/.nanobot/workspace') if storage_config else '~/.nanobot/workspace'
+    return Path(root).expanduser()
+
 from nanobot.utils.helpers import ensure_dir
 
 

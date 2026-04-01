@@ -31,7 +31,6 @@ class ChannelsConfig(Base):
 class AgentDefaults(Base):
     """Default agent configuration."""
 
-    workspace: str = "~/.nanobot/workspace"
     model: str = "anthropic/claude-opus-4-5"
     provider: str = (
         "auto"  # Provider name (e.g. "anthropic", "openrouter") or "auto" for auto-detection
@@ -188,11 +187,6 @@ class Config(BaseSettings):
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
-
-    @property
-    def workspace_path(self) -> Path:
-        """Get expanded workspace path."""
-        return Path(self.agents.defaults.workspace).expanduser()
 
     def _match_provider(
         self, model: str | None = None

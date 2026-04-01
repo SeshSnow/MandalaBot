@@ -34,7 +34,7 @@ from rich.text import Text
 
 from nanobot import __logo__, __version__
 from nanobot.cli.stream import StreamRenderer, ThinkingSpinner
-from nanobot.config.paths import get_workspace_path, is_default_workspace
+from nanobot.config.paths import get_workspace_path, get_workspace_from_storage, is_default_workspace
 from nanobot.config.schema import Config
 from nanobot.utils.helpers import sync_workspace_templates
 
@@ -312,7 +312,7 @@ def onboard(
     _onboard_plugins(config_path)
 
     # Create workspace, preferring the configured workspace path.
-    workspace_path = get_workspace_path(config.workspace_path)
+    workspace_path = get_workspace_path(workspace_path)
     if not workspace_path.exists():
         workspace_path.mkdir(parents=True, exist_ok=True)
         console.print(f"[green]✓[/green] Created workspace at {workspace_path}")
@@ -484,7 +484,7 @@ def _migrate_cron_store(config: "Config") -> None:
     from nanobot.config.paths import get_cron_dir
 
     legacy_path = get_cron_dir() / "jobs.json"
-    new_path = config.workspace_path / "cron" / "jobs.json"
+    new_path = workspace_path / "cron" / "jobs.json"
     if legacy_path.is_file() and not new_path.exists():
         new_path.parent.mkdir(parents=True, exist_ok=True)
         import shutil
@@ -529,18 +529,18 @@ def serve(
     host = host if host is not None else api_cfg.host
     port = port if port is not None else api_cfg.port
     timeout = timeout if timeout is not None else api_cfg.timeout
-    sync_workspace_templates(runtime_config.workspace_path)
+    storage_cfg = runtime_config.storage.model_dump() if hasattr(runtime_config, 'storage') else None
+    workspace_path = get_workspace_from_storage(storage_cfg)
+    workspace_path.mkdir(parents=True, exist_ok=True)
+    sync_workspace_templates(workspace_path)
     bus = MessageBus()
     provider = _make_provider(runtime_config)
-    session_manager = SessionManager(runtime_config.workspace_path)
-    storage = create_storage(
-        config=runtime_config.storage.model_dump() if hasattr(runtime_config, 'storage') else None,
-        workspace=str(runtime_config.workspace_path),
-    )
+    session_manager = SessionManager(workspace_path)
+    storage = create_storage(config=storage_cfg, workspace=str(workspace_path))
     agent_loop = AgentLoop(
         bus=bus,
         provider=provider,
-        workspace=runtime_config.workspace_path,
+        workspace=workspace_path,
         model=runtime_config.agents.defaults.model,
         max_iterations=runtime_config.agents.defaults.max_tool_iterations,
         context_window_tokens=runtime_config.agents.defaults.context_window_tokens,
@@ -612,29 +612,29 @@ def gateway(
     port = port if port is not None else config.gateway.port
 
     console.print(f"{__logo__} Starting nanobot gateway version {__version__} on port {port}...")
-    sync_workspace_templates(config.workspace_path)
+    storage_cfg = config.storage.model_dump() if hasattr(config, 'storage') else None
+    workspace_path = get_workspace_from_storage(storage_cfg)
+    workspace_path.mkdir(parents=True, exist_ok=True)
+    sync_workspace_templates(workspace_path)
     bus = MessageBus()
     provider = _make_provider(config)
-    session_manager = SessionManager(config.workspace_path)
+    session_manager = SessionManager(workspace_path)
     from nanobot.storage.factory import create_storage
-    storage = create_storage(
-        config=config.storage.model_dump() if hasattr(config, 'storage') else None,
-        workspace=str(config.workspace_path),
-    )
+    storage = create_storage(config=storage_cfg, workspace=str(workspace_path))
 
     # Preserve existing single-workspace installs, but keep custom workspaces clean.
-    if is_default_workspace(config.workspace_path):
+    if is_default_workspace(workspace_path):
         _migrate_cron_store(config)
 
     # Create cron service with workspace-scoped store
-    cron_store_path = config.workspace_path / "cron" / "jobs.json"
+    cron_store_path = workspace_path / "cron" / "jobs.json"
     cron = CronService(cron_store_path)
 
     # Create agent with cron service
     agent = AgentLoop(
         bus=bus,
         provider=provider,
-        workspace=config.workspace_path,
+        workspace=workspace_path,
         model=config.agents.defaults.model,
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
@@ -751,7 +751,7 @@ def gateway(
 
     hb_cfg = config.gateway.heartbeat
     heartbeat = HeartbeatService(
-        workspace=config.workspace_path,
+        workspace=workspace_path,
         provider=provider,
         model=agent.model,
         on_execute=on_heartbeat_execute,
@@ -821,21 +821,21 @@ def agent(
     from nanobot.storage.factory import create_storage
 
     config = _load_runtime_config(config, workspace)
-    sync_workspace_templates(config.workspace_path)
+    sync_workspace_templates(workspace_path)
 
     bus = MessageBus()
     provider = _make_provider(config)
     storage = create_storage(
         config=config.storage.model_dump() if hasattr(config, 'storage') else None,
-        workspace=str(config.workspace_path),
+        workspace=str(workspace_path),
     )
 
     # Preserve existing single-workspace installs, but keep custom workspaces clean.
-    if is_default_workspace(config.workspace_path):
+    if is_default_workspace(workspace_path):
         _migrate_cron_store(config)
 
     # Create cron service with workspace-scoped store
-    cron_store_path = config.workspace_path / "cron" / "jobs.json"
+    cron_store_path = workspace_path / "cron" / "jobs.json"
     cron = CronService(cron_store_path)
 
     if logs:
@@ -846,7 +846,7 @@ def agent(
     agent_loop = AgentLoop(
         bus=bus,
         provider=provider,
-        workspace=config.workspace_path,
+        workspace=workspace_path,
         model=config.agents.defaults.model,
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
@@ -1211,7 +1211,7 @@ def status():
 
     config_path = get_config_path()
     config = load_config()
-    workspace = config.workspace_path
+    workspace = workspace_path
 
     console.print(f"{__logo__} nanobot Status\n")
 
