@@ -51,8 +51,38 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Legacy aiohttp (kept for backward compatibility, no longer used by serve)
 api = [
     "aiohttp>=3.9.0,<4.0.0",
+]
+# FastAPI server (replaces aiohttp)
+server = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sse-starlette>=2.0.0",
+]
+# Database support (PostgreSQL + pgvector)
+db = [
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.30.0",
+    "psycopg2-binary>=2.9.0",
+    "alembic>=1.14.0",
+    "pgvector>=0.3.0",
+]
+# Full Mandala application layer (server + db + Shopify/SEO/Azure)
+mandala = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sse-starlette>=2.0.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.30.0",
+    "psycopg2-binary>=2.9.0",
+    "alembic>=1.14.0",
+    "pgvector>=0.3.0",
+    "azure-storage-blob>=12.19.0",
+    "cryptography>=42.0.0",
+    "numpy>=1.26.0",
+    "firecrawl-py>=1.0.0",
 ]
 wecom = [
     "wecom-aibot-sdk-python>=0.1.5",
@@ -61,7 +91,6 @@ weixin = [
     "qrcode[pil]>=8.0",
     "pycryptodome>=3.20.0",
 ]
-
 matrix = [
     "matrix-nio[e2e]>=0.25.2",
     "mistune>=3.0.0,<4.0.0",

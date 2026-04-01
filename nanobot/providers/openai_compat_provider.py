@@ -573,7 +573,20 @@ class OpenAICompatProvider(LLMProvider):
         kwargs["stream"] = True
         kwargs["stream_options"] = {"include_usage": True}
         try:
-            stream = await self._client.chat.completions.create(**kwargs)
+            # OpenAI SDK behavior varies: sometimes returns coroutine, sometimes async iterable
+            result = self._client.chat.completions.create(**kwargs)
+
+            # Try to get the stream - handle both coroutine and direct async iterable cases
+            try:
+                # Try awaiting first (standard SDK pattern)
+                stream = await result
+            except TypeError as await_err:
+                if "async_generator" in str(await_err) or "await" in str(await_err):
+                    # It's an async generator or non-awaitable - use directly
+                    stream = result
+                else:
+                    raise
+
             chunks: list[Any] = []
             async for chunk in stream:
                 chunks.append(chunk)

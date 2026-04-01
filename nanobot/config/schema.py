@@ -168,6 +168,9 @@ class Config(BaseSettings):
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
 
+    # Optional Mandala application layer. Activates when mandala.database_url is set.
+    mandala: "MandalaConfig" = Field(default_factory=lambda: _get_mandala_config())
+
     @property
     def workspace_path(self) -> Path:
         """Get expanded workspace path."""
@@ -268,4 +271,13 @@ class Config(BaseSettings):
                 return spec.default_api_base
         return None
 
-    model_config = ConfigDict(env_prefix="NANOBOT_", env_nested_delimiter="__")
+    model_config = ConfigDict(env_prefix="", env_nested_delimiter="__")
+
+
+def _get_mandala_config() -> "MandalaConfig":
+    from nanobot.config.mandala import MandalaConfig
+    return MandalaConfig()
+
+
+# Re-export for convenience
+from nanobot.config.mandala import MandalaConfig as MandalaConfig  # noqa: E402, F401
