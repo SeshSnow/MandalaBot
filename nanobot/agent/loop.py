@@ -16,7 +16,9 @@ from loguru import logger
 from nanobot.agent.context import ContextBuilder
 from nanobot.agent.hook import AgentHook, AgentHookContext, CompositeHook
 from nanobot.agent.memory import MemoryConsolidator
+from nanobot.agent.profiles import AgentProfileRegistry
 from nanobot.agent.runner import AgentRunSpec, AgentRunner
+from nanobot.agent.skills import SkillsLoader
 from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.skills import BUILTIN_SKILLS_DIR
@@ -197,6 +199,12 @@ class AgentLoop:
         self.sessions = session_manager or SessionManager(workspace)
         self.tools = ToolRegistry()
         self.runner = AgentRunner(provider)
+
+        # Load agent profile definitions
+        _definitions_dir = Path(__file__).parent / "definitions"
+        self.agent_profiles = AgentProfileRegistry(_definitions_dir)
+        self.agent_profiles.load_all()
+
         self.subagents = SubagentManager(
             provider=provider,
             workspace=workspace,
@@ -206,6 +214,8 @@ class AgentLoop:
             web_proxy=web_proxy,
             exec_config=self.exec_config,
             restrict_to_workspace=restrict_to_workspace,
+            profile_registry=self.agent_profiles,
+            skills_loader=SkillsLoader(workspace),
         )
 
         self._running = False

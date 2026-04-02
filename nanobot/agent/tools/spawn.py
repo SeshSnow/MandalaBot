@@ -34,7 +34,8 @@ class SpawnTool(Tool):
             "Use this for complex or time-consuming tasks that can run independently. "
             "The subagent will complete the task and report back when done. "
             "For deliverables or existing projects, inspect the workspace first "
-            "and use a dedicated subdirectory when helpful."
+            "and use a dedicated subdirectory when helpful. "
+            "Use agent_type to spawn a specialized agent with domain-specific skills."
         )
 
     @property
@@ -50,11 +51,25 @@ class SpawnTool(Tool):
                     "type": "string",
                     "description": "Optional short label for the task (for display)",
                 },
+                "agent_type": {
+                    "type": "string",
+                    "description": (
+                        "Optional agent type for specialized subagent (e.g., seo-analyst). "
+                        "When provided, spawns a domain-specific agent with custom skills and persona. "
+                        "Omit for a general-purpose subagent."
+                    ),
+                },
             },
             "required": ["task"],
         }
 
-    async def execute(self, task: str, label: str | None = None, **kwargs: Any) -> str:
+    async def execute(
+        self,
+        task: str,
+        label: str | None = None,
+        agent_type: str | None = None,
+        **kwargs: Any,
+    ) -> str:
         """Spawn a subagent to execute the given task."""
         return await self._manager.spawn(
             task=task,
@@ -62,4 +77,5 @@ class SpawnTool(Tool):
             origin_channel=self._origin_channel,
             origin_chat_id=self._origin_chat_id,
             session_key=self._session_key,
+            agent_type=agent_type,
         )
